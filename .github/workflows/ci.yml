@@ -112,7 +112,8 @@ jobs:
           set -euo pipefail
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
           # a job left out of needs would never be checked
-          missing=$(yq -r '.jobs | keys | .[]' .github/workflows/ci.yml | grep -vx gate | grep -vxF -f <(jq -r 'keys[]' <<< "$NEEDS") || true)
+          jobs=$(yq -r '.jobs | keys | .[]' .github/workflows/ci.yml)
+          missing=$(grep -vx gate <<< "$jobs" | grep -vxF -f <(jq -r 'keys[]' <<< "$NEEDS") || true)
           failed=$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key' <<< "$NEEDS")
           [ -z "$missing" ] || echo "::error::gate does not need: $missing"
           [ -z "$failed" ] || echo "::error::failed: $failed"
