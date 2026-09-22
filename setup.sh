@@ -123,7 +123,7 @@ old=$(sed -n -E 's/^id[[:space:]]*=[[:space:]]*"(.*)"/\1/p' mach.toml)
 sed -i.bak -E \
     -e "s/^(id[[:space:]]*=[[:space:]]*)\"$old\"/\1\"$id\"/" \
     -e "s/^\[artifact\.$old\]/[artifact.$id]/" \
-    -e "s|^(out[[:space:]]*=[[:space:]]*)\"lib/$old\"|\1\"lib/$id\"|" \
+    -e "s|^(out[[:space:]]*=[[:space:]]*\"[^\"]*/)$old|\1$id|" \
     mach.toml
 sed -i.bak -e "s/^# mach-template\$/# $name/" -e '/<!-- template -->/,/<!-- \/template -->/d' README.md
 rm -f mach.toml.bak README.md.bak

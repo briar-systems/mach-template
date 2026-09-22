@@ -1,10 +1,10 @@
 # mach-template
 
 <!-- template -->
-A bone stock [Mach](https://github.com/briar-systems/mach) library, the output
-of `mach init --lib` plus one test, with a GitHub repository set up around it:
-pull request CI on Linux, Windows and macOS, tag-driven releases, protected
-branches, and a label set.
+A bone stock [Mach](https://github.com/briar-systems/mach) Hello, World, the
+output of `mach init` with every host target declared, with a GitHub repository
+set up around it: pull request CI on Linux, Windows and macOS, tag-driven
+releases with prebuilt binaries, protected branches, and a label set.
 
 ## Using this template
 
@@ -37,7 +37,7 @@ Update the copyright holder in `LICENSE` yourself.
 ```sh
 mach dep pull .
 mach build .
-mach test .
+mach run .
 ```
 
 ## Workflow
@@ -67,8 +67,8 @@ Issues are labeled on independent axes:
 ## CI
 
 `.github/workflows/ci.yml` runs on pull requests. A pull request into `dev`
-builds and tests on `x86_64-linux`, and checks formatting and a release build of
-every manifest target. A pull request into `main` also runs `aarch64-linux`,
+builds and tests on `x86_64-linux`, and checks formatting and a release
+cross-build of every manifest target. A pull request into `main` also runs `aarch64-linux`,
 `x86_64-windows`, `aarch64-darwin` and `x86_64-darwin`. To run every leg on any
 branch, use `gh workflow run CI --ref <branch> -f heavy=all`.
 
@@ -86,7 +86,10 @@ The compiler version is `MACH_VERSION` in `ci.yml`. Change it together with the
 
 `.github/workflows/cd.yml` checks that the tag matches the manifest version,
 runs every CI leg, and publishes a GitHub release with notes generated from the
-merged pull requests. A tag with a prerelease part, such as `v1.0.0-rc.1`, is
+merged pull requests. The release carries every executable the manifest builds,
+one archive per target (`.zip` for Windows, `.tar.gz` elsewhere), plus
+`SHA256SUMS`. The names and paths come from `mach build --plan`, so a new
+target or artifact in `mach.toml` is packaged with no workflow change. A tag with a prerelease part, such as `v1.0.0-rc.1`, is
 published as a prerelease.
 
 ## License
