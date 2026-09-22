@@ -126,7 +126,8 @@ sed -i.bak -E \
     -e "s|^(out[[:space:]]*=[[:space:]]*\"[^\"]*/)$old|\1$id|" \
     mach.toml
 sed -i.bak -e "s/^# mach-template\$/# $name/" -e '/<!-- template -->/,/<!-- \/template -->/d' README.md
-rm -f mach.toml.bak README.md.bak
+cat -s README.md > README.md.bak && mv README.md.bak README.md
+rm -f mach.toml.bak
 git rm -q setup.sh
 git add mach.toml README.md
 git commit -q -m "chore: set up $name"
