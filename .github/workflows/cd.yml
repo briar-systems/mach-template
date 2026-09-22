@@ -1,7 +1,7 @@
 name: Release
 
-# a pushed `v*` tag publishes a github release. the tag must match the manifest
-# version and CHANGELOG.md must hold a section for it. every leg runs first.
+# a pushed `v*` tag that matches the manifest version runs every CI leg, then
+# publishes a github release with notes generated from the merged pull requests.
 
 on:
   push:
@@ -18,19 +18,14 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    outputs:
-      version: ${{ steps.verify.outputs.version }}
     steps:
       - uses: actions/checkout@v6
-      - id: verify
-        env:
+      - env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("mach.toml", "rb"))["project"]["version"])')
           [ "$TAG" = "v$version" ] || { echo "::error::tag $TAG does not match mach.toml version $version"; exit 1; }
-          tools/changelog.sh "$version" > /dev/null
-          echo "version=$version" >> "$GITHUB_OUTPUT"
 
   ci:
     needs: verify
@@ -45,11 +40,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
       - env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
-          VERSION: ${{ needs.verify.outputs.version }}
         run: |
           set -euo pipefail
           # a doubled tag push waits on the concurrency group, then finds the release
@@ -58,6 +52,5 @@ jobs:
             exit 0
           fi
           flags=()
-          case "$VERSION" in *-*) flags+=(--prerelease) ;; esac
-          tools/changelog.sh "$VERSION" > notes.md
-          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md "${flags[@]}"
+          case "$TAG" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes "${flags[@]}"
