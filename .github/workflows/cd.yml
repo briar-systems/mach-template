@@ -1,7 +1,8 @@
 name: Release
 
 # a pushed `v*` tag that matches the manifest version runs every CI leg, then
-# publishes a github release with notes generated from the merged pull requests.
+# publishes a github release with every target's binary attached and notes
+# generated from the merged pull requests.
 
 on:
   push:
@@ -40,6 +41,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -53,4 +58,4 @@ jobs:
           fi
           flags=()
           case "$TAG" in *-*) flags+=(--prerelease) ;; esac
-          gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes "${flags[@]}"
+          gh release create "$TAG" dist/* --verify-tag --title "$TAG" --generate-notes "${flags[@]}"
