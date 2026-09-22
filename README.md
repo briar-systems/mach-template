@@ -1,140 +1,92 @@
 # mach-template
 
-A starting point for [Mach](https://github.com/briar-systems/mach) projects. It
-is a small working library with tests, tiered CI across Linux, Windows and
-macOS, tag-driven GitHub releases, and the repository's branch rules and labels
-kept as data you can apply with one command.
-
-It follows the layout and workflow the Briar Systems Mach libraries use, scaled
-down to what a single project needs.
+<!-- template -->
+A bone stock [Mach](https://github.com/briar-systems/mach) library, the output
+of `mach init --lib` plus one test, with a GitHub repository set up around it:
+pull request CI on Linux, Windows and macOS, tag-driven releases, protected
+branches, and a label set.
 
 ## Using this template
 
-1. Click **Use this template** on GitHub, or from the command line:
-
-   ```sh
-   gh repo create you/mach-widgets --template briar-systems/mach-template --public --clone
-   cd mach-widgets
-   mach dep pull .
-   ```
-
-2. Rename the project id. The id is what consumers write in `use widgets;`.
-
-   ```sh
-   tools/rename.sh widgets
-   mach test .
-   ```
-
-3. Replace this README, set the copyright holder in `LICENSE`, and reset
-   `CHANGELOG.md` to an empty `## [Unreleased]` section. Commit and push to
-   `main`.
-
-4. Apply the repository settings, labels and rulesets:
-
-   ```sh
-   tools/github-apply.sh --prune-labels
-   ```
-
-   This creates `dev` from `main` and makes it the default branch, switches the
-   repository to merge commits only, replaces GitHub's stock labels with the set
-   in `.github/repo/labels.json`, and protects `main`, `dev` and release tags.
-   It needs `gh` authenticated with admin rights on the repository, and `jq`.
-
-From here, work happens on branches off `dev`. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Layout
-
-```
-src/
-  example.mach        library surface: re-exports the public api behind `use example;`
-  range.mach          a module with its tests
-dep/std               the standard library, a git submodule pinned by mach
-mach.toml             manifest: targets, profiles, the library artifact, dependencies
-CHANGELOG.md          release notes, one section per version
-tools/
-  rename.sh           rename the project id
-  github-apply.sh     apply .github/repo to the GitHub repository
-  changelog.sh        print one version's changelog section
-.github/
-  ci/legs.json        the runners CI builds and tests on
-  mach-version        the mach release CI installs
-  actions/setup-mach  installs that release, verified against its SHA256SUMS
-  workflows/ci.yml    pull request CI
-  workflows/cd.yml    tag-driven release
-  repo/               settings, labels and rulesets, as data
+```sh
+gh repo create <owner>/<repo> --template briar-systems/mach-template --public --clone
+cd <repo>
+./setup.sh
 ```
 
-Tests live beside the code they test, as `test "name" { ... }` blocks that
-return 0 on success. `mach test .` runs every one of them.
+`setup.sh` is run-and-delete. It runs once, removes itself in the commit it
+makes, and is never needed again. It:
 
-## Branches
+- sets the project id to the repository name, minus any leading `mach-` and
+  with dashes turned into underscores. Pass an id to choose another:
+  `./setup.sh <id>`
+- removes this section from the README
+- commits and pushes those changes
+- creates the `main` and `dev` branches and makes `dev` the default
+- allows merge commits only
+- replaces GitHub's stock labels with the set below
+- adds rulesets that protect `main`, `dev` and `v*` tags
 
-| branch | role |
+It needs `git` and `gh`, logged in with admin rights on the repository.
+Update the copyright holder in `LICENSE` yourself.
+<!-- /template -->
+
+## Build
+
+```sh
+mach dep pull .
+mach build .
+mach test .
+```
+
+## Workflow
+
+`dev` is the default branch. Work branches from it as `feat/<issue>` or
+`fix/<issue>` and merges back through a pull request. `main` only takes release
+merges from `dev`. A `hotfix/<issue>` branches from `main` and merges into both.
+
+Both branches require a pull request and a passing `gate` check. Neither can be
+deleted or force-pushed, and pull requests merge with a merge commit. Repository
+admins can bypass these rules to cut a release. Once a `v*` tag is pushed, only
+an admin can move or delete it.
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org), with
+the issue number as the scope: `fix(#12): reject a negative length`.
+
+Issues are labeled on independent axes:
+
+| axis | labels |
 | --- | --- |
-| `dev` | default branch. Feature and fix branches merge here |
-| `main` | releases only. Takes merges from `dev` and hotfixes |
-| `feat/<n>`, `fix/<n>` | work for issue `n`, branched from `dev` |
-| `hotfix/<n>` | urgent fix branched from `main`, merged to both |
-
-The `branches` ruleset requires a pull request and a passing `gate` check on
-`main` and `dev`, and forbids deleting or force-pushing either. Only merge
-commits are allowed, so history shows exactly what each pull request brought in.
-Repository admins can bypass the rules, which is how a maintainer cuts a
-release merge. The `release tags` ruleset stops anyone but an admin from moving
-or deleting a `v*` tag once it is pushed.
+| semver magnitude | `patch`, `minor`, `major` |
+| kind of work | `feature`, `fix`, `removal`, `chore`, `performance` |
+| where, omitted for core code | `testing`, `tooling`, `doc` |
+| severity and state | `critical`, `blocked`, `security` |
+| discussion | `discussion` |
 
 ## CI
 
-`ci.yml` runs on pull requests only. A merge is covered because a pull request
-builds the merge result, not the branch tip.
+`.github/workflows/ci.yml` runs on pull requests. A pull request into `dev`
+builds and tests on `x86_64-linux`, and checks formatting and a release build of
+every manifest target. A pull request into `main` also runs `aarch64-linux`,
+`x86_64-windows`, `aarch64-darwin` and `x86_64-darwin`. To run every leg on any
+branch, use `gh workflow run CI --ref <branch> -f heavy=all`.
 
-- A pull request into `dev` runs the **light** legs, which by default is
-  `x86_64-linux` alone.
-- A pull request into `main` runs **every** leg: `aarch64-linux`,
-  `x86_64-windows`, `aarch64-darwin` and `x86_64-darwin` as well.
-- **Run workflow** in the Actions tab, or `gh workflow run CI --ref <branch> -f heavy=all`,
-  runs every leg on any branch.
+The last job, `gate`, is the check the branch rules require. It fails if any
+other job failed, or if a job is missing from its `needs`.
 
-Each leg installs mach, pulls dependencies, then builds and tests in `debug` and
-`release`. The first leg also checks formatting and builds every target in the
-manifest. To add or retier a runner, edit `.github/ci/legs.json`. The first
-entry must stay light.
-
-Every job feeds a final job named `gate`, which is the one check the rulesets
-require. It fails if any job failed, and also if a job in `ci.yml` is missing
-from its `needs`, so a new job cannot slip past it. When you add a job, add it
-to `gate`'s `needs`.
-
-To move to a newer compiler, change `.github/mach-version` and the `mach`
-range in `mach.toml` together.
+The compiler version is `MACH_VERSION` in `ci.yml`. Change it together with the
+`mach` range in `mach.toml`.
 
 ## Releases
 
-1. Move the `## [Unreleased]` notes into a `## [X.Y.Z] - date` section of
-   `CHANGELOG.md` and set `version = "X.Y.Z"` in `mach.toml`. Commit it as
-   `chore(release): X.Y.Z`.
-2. Merge `dev` into `main` through a pull request. That runs every leg.
-3. Tag the merge and push the tag:
+1. Set `version` in `mach.toml` and merge that into `dev`.
+2. Merge `dev` into `main` through a pull request, which runs every leg.
+3. Tag `main` and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
-   ```sh
-   git switch main && git pull
-   git tag vX.Y.Z && git push origin vX.Y.Z
-   ```
-
-4. Merge `main` back into `dev`.
-
-`cd.yml` checks that the tag matches the manifest version and that the
-changelog has a section for it, runs every CI leg on the tagged commit, and
-then publishes a GitHub release with that section as its notes. A version with
-a prerelease part, such as `1.0.0-rc.1`, is published as a prerelease. Pushing
-the same tag twice never creates a second release.
-
-Consumers depend on the library by version range, and mach resolves ranges
-against these tags:
-
-```sh
-mach dep add . widgets --git https://github.com/you/mach-widgets --version ^0.1
-```
+`.github/workflows/cd.yml` checks that the tag matches the manifest version,
+runs every CI leg, and publishes a GitHub release with notes generated from the
+merged pull requests. A tag with a prerelease part, such as `v1.0.0-rc.1`, is
+published as a prerelease.
 
 ## License
 

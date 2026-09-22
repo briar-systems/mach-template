@@ -49,7 +49,7 @@ float_reassoc = false
 [artifact.example]
 default = true
 kind    = "static"
-entry   = "example.mach"
+entry   = "lib.mach"
 out     = "lib/example"
 targets = ["*"]
 link    = []
