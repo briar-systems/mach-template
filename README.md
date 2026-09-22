@@ -15,7 +15,8 @@ cd <repo>
 ```
 
 `setup.sh` is run-and-delete. It runs once, removes itself in the commit it
-makes, and is never needed again. It:
+makes, and is never needed again. If it fails partway, fix the cause and run
+it again. It:
 
 - sets the project id to the repository name, minus any leading `mach-` and
   with dashes turned into underscores. Pass an id to choose another:
