@@ -1,0 +1,99 @@
+name: CI
+
+# a pull request into dev runs the light legs, a pull request into main runs
+# every leg, and a dispatch picks the tier. legs live in .github/ci/legs.json.
+# `gate` is the one required check, so every job must be in its needs.
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      heavy:
+        type: string
+        default: none
+  workflow_dispatch:
+    inputs:
+      heavy:
+        description: run the heavy legs on this ref
+        type: choice
+        default: none
+        options: [none, all]
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      legs: ${{ steps.plan.outputs.legs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/ci
+      - id: plan
+        env:
+          HEAVY: ${{ github.base_ref == 'main' && 'all' || inputs.heavy || 'none' }}
+        run: |
+          set -euo pipefail
+          legs=$(jq -c --arg heavy "$HEAVY" \
+            '[to_entries[] | .value + {primary: (.key == 0)} | select(.tier == "light" or $heavy == "all")]' \
+            .github/ci/legs.json)
+          jq -e '.[0].tier == "light"' <<< "$legs" > /dev/null \
+            || { echo "::error::the first leg in legs.json must be light"; exit 1; }
+          echo "legs=$legs" >> "$GITHUB_OUTPUT"
+          jq -r '.[] | "\(.name) (\(.tier))"' <<< "$legs"
+
+  build:
+    name: ${{ matrix.leg.name }}
+    needs: plan
+    runs-on: ${{ matrix.leg.runs-on }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: ${{ fromJSON(needs.plan.outputs.legs) }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-mach
+      - name: dependencies
+        run: mach dep pull .
+      - name: build
+        run: |
+          mach build . --profile debug
+          mach build . --profile release
+      - name: test
+        run: |
+          mach test . --profile debug
+          mach test . --profile release
+      - name: fmt
+        if: matrix.leg.primary
+        run: mach fmt --check .
+      - name: all targets
+        if: matrix.leg.primary
+        run: mach build . --all-targets --profile release
+
+  gate:
+    if: always()
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/workflows
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+          WORKFLOW: ${{ job.workflow_file_path }}
+        run: |
+          set -euo pipefail
+          # read this workflow's own jobs, so a job left out of needs is caught
+          missing=$(yq -r '.jobs | keys | .[]' "$WORKFLOW" | grep -vx gate | grep -vxF -f <(jq -r 'keys[]' <<< "$NEEDS") || true)
+          failed=$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key) finished \(.value.result)"' <<< "$NEEDS")
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          [ -z "$missing" ] || echo "::error::gate does not need: $missing"
+          [ -z "$failed" ] || echo "::error::$failed"
+          [ -z "$missing$failed" ]

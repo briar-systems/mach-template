@@ -1,0 +1,5 @@
+paths:
+  .github/workflows/ci.yml:
+    ignore:
+      # the runner populates job.workflow_file_path; actionlint's schema predates it
+      - 'property "workflow_file_path" is not defined in object type'

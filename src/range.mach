@@ -1,0 +1,28 @@
+# integer range helpers
+
+# clamp v into the closed range [lo, hi]
+# ---
+# v:   the value to clamp
+# lo:  lower bound, at most hi
+# hi:  upper bound
+# ret: lo when v is below it, hi when v is above it, v otherwise
+pub fun clamp(v: i64, lo: i64, hi: i64) i64 {
+    if (v < lo) { ret lo; }
+    or (v > hi) { ret hi; }
+    ret v;
+}
+
+test "range: clamp inside" {
+    if (clamp(5, 0, 10) != 5) { ret 1; }
+    ret 0;
+}
+
+test "range: clamp below" {
+    if (clamp(-3, 0, 10) != 0) { ret 1; }
+    ret 0;
+}
+
+test "range: clamp above" {
+    if (clamp(42, 0, 10) != 10) { ret 1; }
+    ret 0;
+}

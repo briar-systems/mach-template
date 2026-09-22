@@ -1,0 +1,63 @@
+name: Release
+
+# a pushed `v*` tag publishes a github release. the tag must match the manifest
+# version and CHANGELOG.md must hold a section for it. every leg runs first.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: verify
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("mach.toml", "rb"))["project"]["version"])')
+          [ "$TAG" = "v$version" ] || { echo "::error::tag $TAG does not match mach.toml version $version"; exit 1; }
+          tools/changelog.sh "$version" > /dev/null
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  ci:
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+    with:
+      heavy: all
+
+  publish:
+    needs: [verify, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          # a doubled tag push waits on the concurrency group, then finds the release
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "release $TAG already exists"
+            exit 0
+          fi
+          flags=()
+          case "$VERSION" in *-*) flags+=(--prerelease) ;; esac
+          tools/changelog.sh "$VERSION" > notes.md
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md "${flags[@]}"
