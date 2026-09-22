@@ -1,9 +1,0 @@
-# example library surface
-#
-# a bare `use example;` reaches everything re-exported here.
-
-use example.range;
-# links the startup entrypoint so `mach test` over this library produces a binary.
-use std.runtime;
-
-fwd range.clamp;

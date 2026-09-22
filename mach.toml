@@ -1,17 +1,16 @@
 [project]
-id      = "example"
+id = "example"
 version = "0.1.0"
-mach    = "^5.10"
-src     = "src"
-out     = "out/{target.name}/{profile.name}"
+mach = "^5.10"
+src = "src"
+out = "out/{target.name}/{profile.name}"
 
 [target.linux-x86_64]
-default = true
 isa = "x86_64"
 os  = "linux"
 abi = "sysv64"
 
-[target.linux-arm64]
+[target.linux-aarch64]
 isa = "aarch64"
 os  = "linux"
 abi = "aapcs64"
@@ -31,30 +30,37 @@ isa = "aarch64"
 os  = "darwin"
 abi = "aapcs64"
 
+[artifact.example]
+kind = "bin"
+entry = "main.mach"
+out = "bin/example{artifact.suffix}"
+targets = ["*"]
+link = ["kernel32"]
+need = []
+
+[link.kernel32]
+source = "system"
+name = "kernel32.dll"
+os = ["windows"]
+isa = ["*"]
+abi = ["*"]
+export = false
+
 [profile.debug]
 default = true
-opt   = 0
+opt = 0
 debug = true
-simd  = "scalarize"
-vectorize     = false
+simd = "scalarize"
+vectorize = false
 float_reassoc = false
 
 [profile.release]
-opt   = 2
+opt = 2
 debug = false
-simd  = "scalarize"
-vectorize     = false
+simd = "scalarize"
+vectorize = true
 float_reassoc = false
 
-[artifact.example]
-default = true
-kind    = "static"
-entry   = "example.mach"
-out     = "lib/example"
-targets = ["*"]
-link    = []
-need    = []
-
 [dep.std]
-git     = "https://github.com/briar-systems/mach-std"
+git = "https://github.com/briar-systems/mach-std"
 version = "^7.0.2"
