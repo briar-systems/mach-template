@@ -6,10 +6,12 @@
 #   project-id  defaults to the repository name without a leading "mach-",
 #               with dashes turned into underscores
 #
-# it renames the project, strips the template notes from README.md, commits and
-# pushes that, then configures the github repository: main and dev branches with
-# dev as default, merge commits only, the label set, and rulesets protecting
-# main, dev and v* tags. needs git and gh, with admin rights on the repo.
+# it configures the github repository (main and dev branches with dev as
+# default, merge commits only, the label set, and rulesets protecting main, dev
+# and v* tags), then renames the project, strips the template notes from
+# README.md, and commits and pushes that with this script removed. if it fails
+# before that commit, fix the cause and run it again. needs git and gh, with
+# admin rights on the repo.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -19,20 +21,6 @@ id=${1:-$(sed -e 's/^mach-//' -e 's/-/_/g' <<< "$name")}
 [[ "$id" =~ ^[a-z][a-z0-9_]*$ ]] || { echo "error: project id '$id' must match [a-z][a-z0-9_]*, pass one explicitly" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "error: commit or stash your changes first" >&2; exit 1; }
 echo "setting up $repo as project '$id'"
-
-old=$(sed -n -E 's/^id[[:space:]]*=[[:space:]]*"(.*)"/\1/p' mach.toml)
-sed -i.bak -E \
-    -e "s/^(id[[:space:]]*=[[:space:]]*)\"$old\"/\1\"$id\"/" \
-    -e "s/^\[artifact\.$old\]/[artifact.$id]/" \
-    -e "s|^(out[[:space:]]*=[[:space:]]*)\"lib/$old\"|\1\"lib/$id\"|" \
-    mach.toml
-sed -i.bak -e "s/^# mach-template\$/# $name/" -e '/<!-- template -->/,/<!-- \/template -->/d' README.md
-rm -f mach.toml.bak README.md.bak
-git rm -q setup.sh
-git add mach.toml README.md
-git commit -q -m "chore: set up $name"
-git push -q
-echo "committed and pushed the setup"
 
 head=$(gh api "repos/$repo" --jq .default_branch)
 sha=$(gh api "repos/$repo/git/ref/heads/$head" --jq .object.sha)
@@ -82,8 +70,20 @@ for label in bug documentation duplicate enhancement "good first issue" "help wa
 done
 echo "labels set"
 
+# create or update a ruleset by name, so a rerun converges
+ruleset() {
+    local body id
+    body=$(cat)
+    id=$(gh api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$1\") | .id")
+    if [ -n "$id" ]; then
+        gh api --method PUT "repos/$repo/rulesets/$id" --input - > /dev/null <<< "$body"
+    else
+        gh api --method POST "repos/$repo/rulesets" --input - > /dev/null <<< "$body"
+    fi
+}
+
 # repository admins bypass both rulesets, which is how releases are cut
-gh api --method POST "repos/$repo/rulesets" --input - > /dev/null <<'EOF'
+ruleset branches <<'EOF'
 {
   "name": "branches",
   "target": "branch",
@@ -106,7 +106,7 @@ gh api --method POST "repos/$repo/rulesets" --input - > /dev/null <<'EOF'
   ]
 }
 EOF
-gh api --method POST "repos/$repo/rulesets" --input - > /dev/null <<'EOF'
+ruleset "release tags" <<'EOF'
 {
   "name": "release tags",
   "target": "tag",
@@ -116,5 +116,21 @@ gh api --method POST "repos/$repo/rulesets" --input - > /dev/null <<'EOF'
   "rules": [{ "type": "deletion" }, { "type": "update" }]
 }
 EOF
-echo "rulesets created"
+echo "rulesets set"
+
+# the github side is done, so the one step that cannot be rerun goes last
+old=$(sed -n -E 's/^id[[:space:]]*=[[:space:]]*"(.*)"/\1/p' mach.toml)
+sed -i.bak -E \
+    -e "s/^(id[[:space:]]*=[[:space:]]*)\"$old\"/\1\"$id\"/" \
+    -e "s/^\[artifact\.$old\]/[artifact.$id]/" \
+    -e "s|^(out[[:space:]]*=[[:space:]]*)\"lib/$old\"|\1\"lib/$id\"|" \
+    mach.toml
+sed -i.bak -e "s/^# mach-template\$/# $name/" -e '/<!-- template -->/,/<!-- \/template -->/d' README.md
+rm -f mach.toml.bak README.md.bak
+git rm -q setup.sh
+git add mach.toml README.md
+git commit -q -m "chore: set up $name"
+git push -q
+echo "committed and pushed the setup"
+
 echo "done. work happens on branches off dev"
