@@ -53,6 +53,7 @@ debug = true
 simd = "scalarize"
 vectorize = false
 float_reassoc = false
+# allow = ["import.unused"]  # warning keys this profile silences
 
 [profile.release]
 opt = 2
