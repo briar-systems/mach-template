@@ -27,6 +27,8 @@ it again. It:
 - creates the `main` and `dev` branches and makes `dev` the default
 - allows merge commits only
 - replaces GitHub's stock labels with the set below
+- creates the `active`, `deferred` and `parked` status milestones, leaving
+  any that already exist as they are
 - adds rulesets that protect `main`, `dev` and `v*` tags
 
 It needs `git` and `gh`, logged in with admin rights on the repository.
