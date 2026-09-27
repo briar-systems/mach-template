@@ -27,6 +27,8 @@ it again. It:
 - creates the `main` and `dev` branches and makes `dev` the default
 - allows merge commits only
 - replaces GitHub's stock labels with the set below
+- creates the `active`, `deferred` and `parked` status milestones, leaving
+  any that already exist as they are
 - adds rulesets that protect `main`, `dev` and `v*` tags
 
 It needs `git` and `gh`, logged in with admin rights on the repository.
@@ -88,11 +90,13 @@ The compiler version is `MACH_VERSION` in `ci.yml`. Change it together with the
 
 `.github/workflows/cd.yml` checks that the tag matches the manifest version,
 runs every CI leg, and publishes a GitHub release with notes generated from the
-merged pull requests. The release carries every executable the manifest builds,
-one archive per target (`.zip` for Windows, `.tar.gz` elsewhere), plus
+merged pull requests. The release carries every `bin` artifact the manifest
+builds, one archive per target (`.zip` for Windows, `.tar.gz` elsewhere), plus
 `SHA256SUMS`. The names and paths come from `mach build --plan`, so a new
-target or artifact in `mach.toml` is packaged with no workflow change. A tag with a prerelease part, such as `v1.0.0-rc.1`, is
-published as a prerelease.
+target or `bin` artifact in `mach.toml` is packaged with no workflow change. A
+project with no `bin` artifact, such as a library, releases as the tag and its
+notes alone, since consumers pin the tag. A tag with a prerelease part, such as
+`v1.0.0-rc.1`, is published as a prerelease.
 
 ## License
 
