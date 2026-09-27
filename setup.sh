@@ -8,10 +8,10 @@
 #
 # it configures the github repository (main and dev branches with dev as
 # default, merge commits only, the label set, and rulesets protecting main, dev
-# and v* tags), then renames the project, strips the template notes from
-# README.md, and commits and pushes that with this script removed. if it fails
-# before that commit, fix the cause and run it again. needs git and gh, with
-# admin rights on the repo.
+# and v* tags), then renames the project and its entry file, strips the template
+# notes from README.md, and commits and pushes that with this script removed. if
+# it fails before that commit, fix the cause and run it again. needs git and gh,
+# with admin rights on the repo.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -123,8 +123,10 @@ old=$(sed -n -E 's/^id[[:space:]]*=[[:space:]]*"(.*)"/\1/p' mach.toml)
 sed -i.bak -E \
     -e "s/^(id[[:space:]]*=[[:space:]]*)\"$old\"/\1\"$id\"/" \
     -e "s/^\[artifact\.$old\]/[artifact.$id]/" \
+    -e "s|^(entry[[:space:]]*=[[:space:]]*\"bin/)$old\.mach\"|\1$id.mach\"|" \
     -e "s|^(out[[:space:]]*=[[:space:]]*\"[^\"]*/)$old|\1$id|" \
     mach.toml
+[ "$old" = "$id" ] || git mv "src/bin/$old.mach" "src/bin/$id.mach"
 sed -i.bak -e "s/^# mach-template\$/# $name/" -e '/<!-- template -->/,/<!-- \/template -->/d' README.md
 cat -s README.md > README.md.bak && mv README.md.bak README.md
 rm -f mach.toml.bak

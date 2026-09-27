@@ -1,7 +1,7 @@
 [project]
 id = "example"
 version = "0.1.0"
-mach = "^5.10"
+mach = "^6.3"
 src = "src"
 out = "out/{target.name}/{profile.name}"
 
@@ -32,7 +32,7 @@ abi = "aapcs64"
 
 [artifact.example]
 kind = "bin"
-entry = "main.mach"
+entry = "bin/example.mach"
 out = "bin/example{artifact.suffix}"
 targets = ["*"]
 link = ["kernel32"]
@@ -53,6 +53,7 @@ debug = true
 simd = "scalarize"
 vectorize = false
 float_reassoc = false
+# allow = ["import.unused"]  # warning keys this profile silences
 
 [profile.release]
 opt = 2
@@ -63,4 +64,4 @@ float_reassoc = false
 
 [dep.std]
 git = "https://github.com/briar-systems/mach-std"
-version = "^7.0.2"
+version = "^9.0"

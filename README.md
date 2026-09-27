@@ -1,10 +1,11 @@
 # mach-template
 
 <!-- template -->
-A bone stock [Mach](https://github.com/briar-systems/mach) Hello, World, the
-output of `mach init` with every host target declared, with a GitHub repository
-set up around it: pull request CI on Linux, Windows and macOS, tag-driven
-releases with prebuilt binaries, protected branches, and a label set.
+A bone stock [Mach](https://github.com/briar-systems/mach) 6.3 Hello, World,
+the project `mach init` makes with every host target declared and its entry at
+`src/bin/<id>.mach`, with a GitHub repository set up around it: pull request CI
+on Linux, Windows and macOS, tag-driven releases with prebuilt binaries,
+protected branches, and a label set.
 
 ## Using this template
 
@@ -19,8 +20,8 @@ makes, and is never needed again. If it fails partway, fix the cause and run
 it again. It:
 
 - sets the project id to the repository name, minus any leading `mach-` and
-  with dashes turned into underscores. Pass an id to choose another:
-  `./setup.sh <id>`
+  with dashes turned into underscores, and renames the entry file to match.
+  Pass an id to choose another: `./setup.sh <id>`
 - removes this section from the README
 - commits and pushes those changes
 - creates the `main` and `dev` branches and makes `dev` the default
@@ -38,7 +39,17 @@ Update the copyright holder in `LICENSE` yourself.
 mach dep pull .
 mach build .
 mach run .
+mach test . --timeout 5m
 ```
+
+A binary artifact's entry is `src/bin/<id>.mach` and a library's is
+`src/lib/<id>.mach`. Tests are `test subject__case { }` blocks, and a helper
+only tests use is marked `#[testing]`. What earns a test is Mach's
+[test policy](https://github.com/briar-systems/mach/blob/v6.3.0/doc/language/test.md#test-policy).
+
+A profile silences warnings across the build by their dotted keys, as in
+`allow = ["import.unused"]`. To acknowledge one warning where it is raised, put
+`#[expect("key")]` on the declaration instead.
 
 ## Workflow
 
