@@ -42,15 +42,6 @@ mach run .
 mach test . --timeout 5m
 ```
 
-A binary artifact's entry is `src/bin/<id>.mach` and a library's is
-`src/lib/<id>.mach`. Tests are `test subject__case { }` blocks, and a helper
-only tests use is marked `#[testing]`. What earns a test is Mach's
-[test policy](https://github.com/briar-systems/mach/blob/v6.3.0/doc/language/test.md#test-policy).
-
-A profile silences warnings across the build by their dotted keys, as in
-`allow = ["import.unused"]`. To acknowledge one warning where it is raised, put
-`#[expect("key")]` on the declaration instead.
-
 ## Workflow
 
 `dev` is the default branch. Work branches from it as `feat/<issue>` or
