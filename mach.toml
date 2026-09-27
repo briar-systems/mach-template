@@ -32,7 +32,7 @@ abi = "aapcs64"
 
 [artifact.example]
 kind = "bin"
-entry = "main.mach"
+entry = "bin/example.mach"
 out = "bin/example{artifact.suffix}"
 targets = ["*"]
 link = ["kernel32"]
