@@ -7,11 +7,11 @@
 #               with dashes turned into underscores
 #
 # it configures the github repository (main and dev branches with dev as
-# default, merge commits only, the label set, and rulesets protecting main, dev
-# and v* tags), then renames the project and its entry file, strips the template
-# notes from README.md, and commits and pushes that with this script removed. if
-# it fails before that commit, fix the cause and run it again. needs git and gh,
-# with admin rights on the repo.
+# default, merge commits only, the label set, the status milestones, and
+# rulesets protecting main, dev and v* tags), then renames the project and its
+# entry file, strips the template notes from README.md, and commits and pushes
+# that with this script removed. if it fails before that commit, fix the cause
+# and run it again. needs git and gh, with admin rights on the repo.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -69,6 +69,19 @@ for label in bug documentation duplicate enhancement "good first issue" "help wa
     gh label delete "$label" -R "$repo" --yes > /dev/null 2>&1 || true
 done
 echo "labels set"
+
+# milestones record status. one that already exists is left as it is
+milestones=$(gh api --paginate "repos/$repo/milestones?state=all" --jq '.[].title')
+while IFS='|' read -r title description; do
+    grep -qxF "$title" <<< "$milestones" && continue
+    gh api --method POST "repos/$repo/milestones" -f title="$title" -f description="$description" > /dev/null
+    echo "created milestone $title"
+done <<'EOF'
+active|The current slice: work in flight and queued next.
+deferred|Planned, and picked up after the current slice.
+parked|Deliberately set aside until something changes. No milestone means backlog.
+EOF
+echo "milestones set"
 
 # create or update a ruleset by name, so a rerun converges
 ruleset() {
