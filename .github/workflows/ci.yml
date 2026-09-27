@@ -91,8 +91,8 @@ jobs:
       - run: mach dep pull .
       - run: mach build . --profile debug
       - run: mach build . --profile release
-      - run: mach test . --profile debug
-      - run: mach test . --profile release
+      - run: mach test . --profile debug --timeout 5m
+      - run: mach test . --profile release --timeout 5m
       - if: matrix.leg.primary
         run: mach fmt --check .
       - if: matrix.leg.primary
