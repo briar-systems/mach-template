@@ -75,8 +75,10 @@ formatting and builds every target, including those no runner can execute, such
 as riscv. Those are built, never tested, in CI. Nothing runs under emulation.
 
 The host table is in the `plan` job. Delete a row to stop testing on that host
-while still building for it. Anything else a project needs goes in as its own job
-in `ci.yml`, listed in `gate`'s `needs`.
+while still building for it.
+
+CI checks that the project builds and its unit tests pass. Integration, load or
+demo suites are not CI jobs. Run them locally.
 
 `gate` is the check the branch rules require. It fails if any job it needs
 failed or was cancelled.
