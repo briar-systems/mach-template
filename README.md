@@ -27,8 +27,6 @@ it again. It:
 - creates the `main` and `dev` branches and makes `dev` the default
 - allows merge commits only
 - replaces GitHub's stock labels with the set below
-- creates the `active`, `deferred` and `parked` status milestones, leaving
-  any that already exist as they are
 - adds rulesets that protect `main`, `dev` and `v*` tags
 
 It needs `git` and `gh`, logged in with admin rights on the repository.
@@ -65,38 +63,41 @@ Issues are labeled on independent axes:
 | semver magnitude | `patch`, `minor`, `major` |
 | kind of work | `feature`, `fix`, `removal`, `chore`, `performance` |
 | where, omitted for core code | `testing`, `tooling`, `doc` |
-| severity and state | `critical`, `blocked`, `security` |
+| severity and state | `critical`, `blocked`, `parked`, `security` |
 | discussion | `discussion` |
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pull requests. A pull request into `dev`
-builds and tests on `x86_64-linux`, and checks formatting and a release
-cross-build of every manifest target. A pull request into `main` also runs `aarch64-linux`,
-`x86_64-windows`, `aarch64-darwin` and `x86_64-darwin`. To run every leg on any
-branch, use `gh workflow run CI --ref <branch> -f heavy=all`.
+`.github/workflows/ci.yml` runs on pull requests and on dispatch. It spins up one
+native runner per host OS and ISA that `mach.toml` declares a target for, and
+each runs `mach test . --all` for its own targets. One Linux runner also checks
+formatting and builds every target, including those no runner can execute, such
+as riscv. Those are built, never tested, in CI. Nothing runs under emulation.
 
-The last job, `gate`, is the check the branch rules require. It fails if any
-other job failed, or if a job is missing from its `needs`.
+The host table is in the `plan` job. Delete a row to stop testing on that host
+while still building for it. Anything else a project needs goes in as its own job
+in `ci.yml`, listed in `gate`'s `needs`.
 
-The compiler version is `MACH_VERSION` in `ci.yml`. Change it together with the
-`mach` range in `mach.toml`.
+`gate` is the check the branch rules require. It fails if any job it needs
+failed or was cancelled.
+
+The compiler version is `MACH_VERSION`, an exact release, in `ci.yml` and
+`cd.yml`. Change it together with the `mach` range in `mach.toml`.
 
 ## Releases
 
 1. Set `version` in `mach.toml` and merge that into `dev`.
-2. Merge `dev` into `main` through a pull request, which runs every leg.
+2. Merge `dev` into `main`.
 3. Tag `main` and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
 `.github/workflows/cd.yml` checks that the tag matches the manifest version,
-runs every CI leg, and publishes a GitHub release with notes generated from the
-merged pull requests. The release carries every `bin` artifact the manifest
-builds, one archive per target (`.zip` for Windows, `.tar.gz` elsewhere), plus
-`SHA256SUMS`. The names and paths come from `mach build --plan`, so a new
-target or `bin` artifact in `mach.toml` is packaged with no workflow change. A
-project with no `bin` artifact, such as a library, releases as the tag and its
-notes alone, since consumers pin the tag. A tag with a prerelease part, such as
-`v1.0.0-rc.1`, is published as a prerelease.
+runs CI in the release profile, builds every artifact for every target in
+release, and publishes a GitHub release. Each artifact is packaged per target
+(`.zip` for Windows, `.tar.gz` elsewhere) with `SHA256SUMS`. Names and paths come
+from `mach build --plan`, so a new target or artifact needs no workflow change.
+The notes are the version's `CHANGELOG.md` section, or generated from merged pull
+requests when there is none. A tag with a prerelease part, such as `v1.0.0-rc.1`,
+is published as a prerelease.
 
 ## License
 

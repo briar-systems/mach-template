@@ -7,7 +7,7 @@
 #               with dashes turned into underscores
 #
 # it configures the github repository (main and dev branches with dev as
-# default, merge commits only, the label set, the status milestones, and
+# default, merge commits only, the label set, and
 # rulesets protecting main, dev and v* tags), then renames the project and its
 # entry file, strips the template notes from README.md, and commits and pushes
 # that with this script removed. if it fails before that commit, fix the cause
@@ -62,6 +62,7 @@ tooling|0969da|Build systems, workflows, CI/CD, and developer tooling
 doc|54aeff|Documentation, guides, specifications, and comments
 critical|cf222e|Urgent blocker requiring immediate resolution
 blocked|d93f0b|Work is waiting on an external dependency or upstream issue
+parked|bfd4f2|Deliberately set aside until something changes
 security|82071e|Vulnerability or cryptographic security concern
 discussion|d4c5f9|Design proposal, RFC, or open debate
 EOF
@@ -69,19 +70,6 @@ for label in bug documentation duplicate enhancement "good first issue" "help wa
     gh label delete "$label" -R "$repo" --yes > /dev/null 2>&1 || true
 done
 echo "labels set"
-
-# milestones record status. one that already exists is left as it is
-milestones=$(gh api --paginate "repos/$repo/milestones?state=all" --jq '.[].title')
-while IFS='|' read -r title description; do
-    grep -qxF "$title" <<< "$milestones" && continue
-    gh api --method POST "repos/$repo/milestones" -f title="$title" -f description="$description" > /dev/null
-    echo "created milestone $title"
-done <<'EOF'
-active|The current slice: work in flight and queued next.
-deferred|Planned, and picked up after the current slice.
-parked|Deliberately set aside until something changes. No milestone means backlog.
-EOF
-echo "milestones set"
 
 # create or update a ruleset by name, so a rerun converges
 ruleset() {
