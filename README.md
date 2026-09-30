@@ -68,14 +68,15 @@ Issues are labeled on independent axes:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pull requests and on dispatch. It spins up one
-native runner per host OS and ISA that `mach.toml` declares a target for, and
-each runs `mach test . --all` for its own targets. One Linux runner also checks
-formatting and builds every target, including those no runner can execute, such
-as riscv. Those are built, never tested, in CI. Nothing runs under emulation.
+`.github/workflows/ci.yml` runs on pull requests, on Linux. It checks formatting,
+builds every artifact for every target in `mach.toml`, and runs the unit tests of
+the targets the runner can execute. Targets no runner executes, such as riscv, are
+built, never tested. Nothing runs under emulation.
 
-The host table is in the `plan` job. Delete a row to stop testing on that host
-while still building for it.
+To test on other hosts before merging, such as a darwin-specific change, dispatch
+it on the branch: `gh workflow run CI --ref <branch> -f runners='["macos-15"]'`.
+A project whose primary host is not Linux changes the default runner list in the
+`test` job's matrix.
 
 CI checks that the project builds and its unit tests pass. Integration, load or
 demo suites are not CI jobs. Run them locally.
@@ -93,8 +94,9 @@ The compiler version is `MACH_VERSION`, an exact release, in `ci.yml` and
 3. Tag `main` and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
 `.github/workflows/cd.yml` checks that the tag matches the manifest version,
-runs CI in the release profile, builds every artifact for every target in
-release, and publishes a GitHub release. Each artifact is packaged per target
+runs CI in the release profile on every host the project ships to (the
+`runners` list in `cd.yml`, trimmed to the targets it declares), cross-builds
+every artifact for every target in release, and publishes a GitHub release. Each artifact is packaged per target
 (`.zip` for Windows, `.tar.gz` elsewhere) with `SHA256SUMS`. Names and paths come
 from `mach build --plan`, so a new target or artifact needs no workflow change.
 The notes are the version's `CHANGELOG.md` section, or generated from merged pull

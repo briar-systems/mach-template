@@ -3,8 +3,14 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      runners:
+        description: runners to test on, as a JSON array, e.g. ["macos-15", "windows-latest"]
+        type: string
   workflow_call:
     inputs:
+      runners:
+        type: string
       profile:
         type: string
         default: debug
@@ -21,48 +27,15 @@ env:
   PROFILE: ${{ inputs.profile || 'debug' }}
 
 jobs:
-  # one runner per host os and isa the manifest declares a target for
-  plan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      hosts: ${{ steps.plan.outputs.hosts }}
-    steps:
-      - uses: actions/checkout@v6
-      - id: plan
-        shell: python
-        run: |
-          import json, os, tomllib
-
-          # a target with no runner here is built, never tested
-          runners = {
-              ("linux", "x86_64"): "ubuntu-latest",
-              ("linux", "aarch64"): "ubuntu-24.04-arm",
-              ("windows", "x86_64"): "windows-latest",
-              ("darwin", "aarch64"): "macos-15",
-              ("darwin", "x86_64"): "macos-15-intel",
-          }
-          hosts = {}
-          for name, t in tomllib.load(open("mach.toml", "rb")).get("target", {}).items():
-              runner = runners.get((t["os"], t["isa"]))
-              print(f"{name}: {runner or 'build only'}")
-              if runner:
-                  hosts.setdefault(runner, []).append(f"-t {name}")
-          if not hosts:
-              raise SystemExit("no target in mach.toml has a native runner")
-          matrix = [{"runs-on": r, "targets": " ".join(t)} for r, t in hosts.items()]
-          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
-              out.write(f"hosts={json.dumps(matrix)}\n")
-
+  # every runner builds every artifact for every target and tests the ones it can run
   test:
-    needs: plan
-    name: test (${{ matrix.host.runs-on }})
-    runs-on: ${{ matrix.host.runs-on }}
-    timeout-minutes: 30
+    name: test (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        host: ${{ fromJSON(needs.plan.outputs.hosts) }}
+        runner: ${{ fromJSON(inputs.runners || '["ubuntu-latest"]') }}
     defaults:
       run:
         shell: bash
@@ -79,26 +52,13 @@ jobs:
           fi
           echo "$MACH_INSTALL_DIR" >> "$GITHUB_PATH"
       - run: mach dep pull .
-      - run: mach test . --all -p "$PROFILE" ${{ matrix.host.targets }}
-
-  # every target, including the ones no runner can execute
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-      - name: install mach
-        run: |
-          export MACH_INSTALL_DIR="$RUNNER_TEMP/mach"
-          curl -fsSL "https://raw.githubusercontent.com/briar-systems/mach/v$MACH_VERSION/dist/install.sh" | sh
-          echo "$MACH_INSTALL_DIR" >> "$GITHUB_PATH"
-      - run: mach dep pull .
-      - run: mach fmt --check .
-      - run: mach build . --all -p "$PROFILE"
+      - if: strategy.job-index == 0
+        run: mach fmt --check .
+      - run: mach test . --all -p "$PROFILE"
 
   gate:
     if: always()
-    needs: [plan, test, build]
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - run: exit ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 1 || 0 }}
